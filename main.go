@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/chneau/proxybroker/pkg/proxybroker"
-	"github.com/chneau/proxybroker/pkg/ratelimit"
+	"github.com/chneau/proxybroker/pkg/rate"
 	"github.com/elazarl/goproxy"
 )
 
@@ -14,7 +14,7 @@ func main() {
 	go SetUpLocalProxy()
 	pb := proxybroker.
 		NewDefault().
-		WithDomainRateLimit("ip-api.com", ratelimit.New().WithLimit(1, time.Second)).
+		WithDomainRateLimit("ip-api.com", rate.NewLimit().WithConstraint(1, time.Second)).
 		WithSourceFn(func() []string { return []string{"127.0.0.1:5000"} }).
 		Init()
 	_ = pb

@@ -1,4 +1,4 @@
-package ratelimit
+package rate
 
 import "time"
 
@@ -21,7 +21,7 @@ func (limit *Limit) Use() {
 	}
 }
 
-func (limit *Limit) WithLimit(requests int, duration time.Duration) *Limit {
+func (limit *Limit) WithConstraint(requests int, duration time.Duration) *Limit {
 	limit.addConstraint(Constraint{Requests: requests, Duration: duration})
 	return limit
 }
@@ -33,4 +33,4 @@ func (limit *Limit) addConstraint(constraint Constraint) {
 	limit.Constraints = append(limit.Constraints, constraint)
 }
 
-func New() *Limit { return &Limit{} }
+func NewLimit() *Limit { return &Limit{} }
