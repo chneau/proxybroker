@@ -17,12 +17,17 @@ type Proxy struct {
 	LimitsPerDomain map[string]*rate.Limit
 	mtx             *sync.Mutex
 	index           int
+	IsReady         bool
 }
 
 // sync allows to write `defer proxy.sync()()` one liner
 func (proxy *Proxy) sync() func() {
 	proxy.mtx.Lock()
-	return proxy.mtx.Unlock
+	proxy.IsReady = false
+	return func() {
+		proxy.mtx.Unlock()
+		proxy.IsReady = true
+	}
 }
 
 // MeanTime returns the mean time it took the last 10 requests
@@ -70,7 +75,8 @@ func (proxy *Proxy) Do(req *http.Request) []byte {
 func NewProxy(proxy string) *Proxy {
 	proxyUrl, _ := url.Parse("http://" + proxy)
 	p := &Proxy{
-		Name: proxy,
+		IsReady: true,
+		Name:    proxy,
 		Client: &http.Client{
 			Timeout: time.Second * 10,
 			Transport: &http.Transport{

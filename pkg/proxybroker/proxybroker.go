@@ -28,13 +28,10 @@ func (pb *ProxyBroker) Do(req *http.Request) (result []byte) {
 	bestWhen := time.Duration(math.MaxInt64)
 	bestProxy := (*Proxy)(nil)
 	for _, proxy := range pb.PriorityQueue {
-		when := proxy.LimitsPerDomain[req.Host].When()
-		if when == 0 {
-			result = proxy.Do(req)
-			log.Println(proxy.Name, proxy.index)
-			heap.Fix(&pb.PriorityQueue, proxy.index)
-			return result
+		if !proxy.IsReady {
+			continue
 		}
+		when := proxy.LimitsPerDomain[req.Host].When()
 		if when < bestWhen {
 			bestWhen = when
 			bestProxy = proxy
