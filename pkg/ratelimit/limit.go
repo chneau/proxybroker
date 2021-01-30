@@ -12,6 +12,8 @@ func (limit Limit) Ready() bool {
 	return limit.Constraints.Ready(limit.Calls)
 }
 
+func (limit Limit) Clone() Limit { return limit }
+
 func (limit *Limit) Use() {
 	limit.Calls = append(limit.Calls, time.Now())
 	if len(limit.Calls) > limit.Max {

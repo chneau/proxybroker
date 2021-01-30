@@ -61,9 +61,7 @@ func ProxiesFromDailyFreeProxy() []string {
 		}
 		str := string(bb)
 		proxies := ipPortRegex.FindAllString(str, -1)
-		for _, p := range proxies {
-			urls = append(urls, "http://"+p)
-		}
+		urls = append(urls, proxies...)
 	})
 	wg.Wait()
 	return urls
@@ -82,11 +80,7 @@ func ProxiesFromSmallSeoTools() []string {
 	}
 	str := string(bb)
 	proxies := ipPortRegex.FindAllString(str, -1)
-	urls := make([]string, len(proxies))
-	for i := range proxies {
-		urls[i] = "http://" + proxies[i]
-	}
-	return urls
+	return proxies
 }
 
 // ProxiesFromDailyProxy returns proxies from https://proxy-daily.com/.
@@ -102,11 +96,7 @@ func ProxiesFromDailyProxy() []string {
 	}
 	httpList := doc.Find(".centeredProxyList.freeProxyStyle").First().Text()
 	proxies := ipPortRegex.FindAllString(httpList, -1)
-	urls := make([]string, len(proxies))
-	for i := range proxies {
-		urls[i] = "http://" + proxies[i]
-	}
-	return urls
+	return proxies
 }
 
 // ProxiesFromClarketm returns proxies from clarketm/proxy-list.
@@ -122,11 +112,7 @@ func ProxiesFromClarketm() []string {
 	}
 	str := string(bb)
 	proxies := ipPortRegex.FindAllString(str, -1)
-	urls := make([]string, len(proxies))
-	for i := range proxies {
-		urls[i] = "http://" + proxies[i]
-	}
-	return urls
+	return proxies
 }
 
 // ProxiesFromTheSpeedX returns proxies from hookzof/socks5_list.
@@ -142,11 +128,7 @@ func ProxiesFromTheSpeedX() []string {
 	}
 	str := string(bb)
 	proxies := ipPortRegex.FindAllString(str, -1)
-	urls := make([]string, len(proxies))
-	for i := range proxies {
-		urls[i] = "http://" + proxies[i]
-	}
-	return urls
+	return proxies
 }
 
 type proxy struct {
@@ -173,13 +155,13 @@ func ProxiesFromSunny9577() []string {
 	}
 	urls := []string{}
 	for _, proxy := range proxies.Proxynova {
-		urls = append(urls, "http://"+proxy.IP+":"+proxy.Port)
+		urls = append(urls, proxy.IP+":"+proxy.Port)
 	}
 	for _, proxy := range proxies.Usproxy {
-		urls = append(urls, "http://"+proxy.IP+":"+proxy.Port)
+		urls = append(urls, proxy.IP+":"+proxy.Port)
 	}
 	for _, proxy := range proxies.Hidemyname {
-		urls = append(urls, "http://"+proxy.IP+":"+proxy.Port)
+		urls = append(urls, proxy.IP+":"+proxy.Port)
 	}
 	return urls
 }
@@ -202,7 +184,7 @@ func ProxiesFromFate0() []string {
 		if err != nil {
 			return nil
 		}
-		urls = append(urls, "http://"+proxy.Host+":"+strconv.Itoa(proxy.Port))
+		urls = append(urls, proxy.Host+":"+strconv.Itoa(proxy.Port))
 	}
 	return urls
 }
@@ -229,5 +211,3 @@ func All() []string {
 	sort.Strings(proxies)
 	return proxies
 }
-
-// TODO: check if other exist here https://github.com/topics/proxy-list?o=desc&s=updated
