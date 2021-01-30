@@ -17,13 +17,15 @@ type Proxy struct {
 	mtx             *sync.Mutex
 }
 
-func (proxy *Proxy) Sync() func() {
+// sync allows to write `defer proxy.sync()()` one liner
+func (proxy *Proxy) sync() func() {
 	proxy.mtx.Lock()
 	return proxy.mtx.Unlock
 }
 
+// MeanTime returns the mean time it took the last 10 requests
 func (proxy *Proxy) MeanTime() time.Duration {
-	defer proxy.Sync()()
+	defer proxy.sync()()
 	mean := time.Duration(0)
 	for _, time := range proxy.Times {
 		mean += time
@@ -33,7 +35,7 @@ func (proxy *Proxy) MeanTime() time.Duration {
 }
 
 func (proxy *Proxy) Do(req *http.Request) []byte {
-	defer proxy.Sync()()
+	defer proxy.sync()()
 	start := time.Now()
 	resp, err := proxy.Client.Do(req)
 	if err != nil {
