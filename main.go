@@ -20,8 +20,7 @@ func main() {
 	for {
 		go func() {
 			req, _ := http.NewRequest("GET", "http://api.ipify.org/", nil)
-			ip := pb.Do(req)
-			log.Println(string(ip))
+			pb.Do(req)
 		}()
 		time.Sleep(time.Millisecond * 250)
 	}

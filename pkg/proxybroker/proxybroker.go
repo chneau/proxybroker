@@ -3,8 +3,8 @@ package proxybroker
 import (
 	"container/heap"
 	"log"
-	"math"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/chneau/proxybroker/pkg/proxylist"
@@ -15,6 +15,7 @@ type ProxyBroker struct {
 	// Proxies
 	PriorityQueue PriorityQueue
 	ProxyExist    map[string]bool
+	mtxSelection  *sync.Mutex
 
 	// Config
 	SourceFn                   func() []string
@@ -24,8 +25,10 @@ type ProxyBroker struct {
 	NumberOfParallelTest       int
 }
 
-func (pb *ProxyBroker) Do(req *http.Request) (result []byte) {
-	bestWhen := time.Duration(math.MaxInt64)
+func (pb *ProxyBroker) selection(req *http.Request) *Proxy {
+	pb.mtxSelection.Lock()
+	defer pb.mtxSelection.Unlock()
+	bestWhen := time.Second
 	bestProxy := (*Proxy)(nil)
 	for _, proxy := range pb.PriorityQueue {
 		if !proxy.IsReady {
@@ -38,9 +41,32 @@ func (pb *ProxyBroker) Do(req *http.Request) (result []byte) {
 		}
 	}
 	time.Sleep(bestWhen)
-	result = bestProxy.Do(req)
-	heap.Fix(&pb.PriorityQueue, bestProxy.index)
-	return result
+	if bestProxy != nil {
+		heap.Remove(&pb.PriorityQueue, bestProxy.index)
+	}
+	return bestProxy
+}
+func (pb *ProxyBroker) putBack(proxy *Proxy) {
+	pb.mtxSelection.Lock()
+	defer pb.mtxSelection.Unlock()
+	pb.PriorityQueue.Push(proxy)
+}
+
+func (pb *ProxyBroker) Do(req *http.Request) (result []byte) {
+	var proxy *Proxy
+	for {
+		proxy = pb.selection(req)
+		if proxy == nil {
+			continue
+		}
+		result = proxy.Do(req)
+		log.Println("proxy", proxy.Name, proxy.index, "===>", string(result), len(result), result == nil)
+		pb.putBack(proxy)
+		if result == nil {
+			continue
+		}
+		return result
+	}
 }
 
 func (pb *ProxyBroker) WithDomainRateLimit(domain string, limit *rate.Limit) *ProxyBroker {
@@ -104,6 +130,7 @@ func NewDefault() *ProxyBroker {
 		NumberOfParallelTest:       50,
 		PriorityQueue:              PriorityQueue{},
 		ProxyExist:                 map[string]bool{},
+		mtxSelection:               &sync.Mutex{},
 	}
 	return pb
 }
