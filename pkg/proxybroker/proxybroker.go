@@ -1,7 +1,9 @@
 package proxybroker
 
 import (
+	"container/heap"
 	"log"
+	"math"
 	"net/http"
 	"time"
 
@@ -10,6 +12,10 @@ import (
 )
 
 type ProxyBroker struct {
+	// Proxies
+	PriorityQueue PriorityQueue
+	ProxyExist    map[string]bool
+
 	// Config
 	SourceFn                   func() []string
 	ProxyTesterFn              func(string) *Proxy
@@ -18,8 +24,26 @@ type ProxyBroker struct {
 	NumberOfParallelTest       int
 }
 
-func (pb *ProxyBroker) Do(req *http.Request) []byte {
-	return nil
+func (pb *ProxyBroker) Do(req *http.Request) (result []byte) {
+	bestWhen := time.Duration(math.MaxInt64)
+	bestProxy := (*Proxy)(nil)
+	for _, proxy := range pb.PriorityQueue {
+		when := proxy.LimitsPerDomain[req.Host].When()
+		if when == 0 {
+			result = proxy.Do(req)
+			log.Println(proxy.Name, proxy.index)
+			heap.Fix(&pb.PriorityQueue, proxy.index)
+			return result
+		}
+		if when < bestWhen {
+			bestWhen = when
+			bestProxy = proxy
+		}
+	}
+	time.Sleep(bestWhen)
+	result = bestProxy.Do(req)
+	heap.Fix(&pb.PriorityQueue, bestProxy.index)
+	return result
 }
 
 func (pb *ProxyBroker) WithDomainRateLimit(domain string, limit *rate.Limit) *ProxyBroker {
@@ -44,21 +68,32 @@ func (pb *ProxyBroker) autoFetchSource(newArrival chan string) {
 
 func (pb *ProxyBroker) tester(newArrival chan string) {
 	for proxy := range newArrival {
-		client := pb.ProxyTesterFn(proxy)
-		if client != nil {
-			log.Println(proxy)
-			// client.LimitsPerDomain
-		} else {
-			log.Println(proxy, "failed")
+		if _, exist := pb.ProxyExist[proxy]; !exist {
+			client := pb.ProxyTesterFn(proxy)
+			if client != nil {
+				for k, v := range pb.LimitsPerDomain {
+					client.LimitsPerDomain[k] = v.Clone()
+				}
+				pb.PriorityQueue.Push(client)
+				pb.ProxyExist[proxy] = true
+			}
 		}
 	}
 }
 
-func (pb *ProxyBroker) Init() *ProxyBroker {
+func (pb *ProxyBroker) Init(waitN int) *ProxyBroker {
 	newArrival := make(chan string)
 	go pb.autoFetchSource(newArrival)
 	for i := 0; i < pb.NumberOfParallelTest; i++ {
 		go pb.tester(newArrival)
+	}
+	for {
+		len := pb.PriorityQueue.Len()
+		log.Println("Waiting ", len, "/", waitN)
+		if len >= waitN {
+			break
+		}
+		time.Sleep(time.Millisecond * 250)
 	}
 	return pb
 }
@@ -69,7 +104,9 @@ func NewDefault() *ProxyBroker {
 		LimitsPerDomain:            map[string]*rate.Limit{},
 		ProxyTesterFn:              ProxyTester,
 		DurationBetweenSourceFetch: time.Minute,
-		NumberOfParallelTest:       10,
+		NumberOfParallelTest:       50,
+		PriorityQueue:              PriorityQueue{},
+		ProxyExist:                 map[string]bool{},
 	}
 	return pb
 }

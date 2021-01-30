@@ -14,11 +14,17 @@ func main() {
 	go SetUpLocalProxy()
 	pb := proxybroker.
 		NewDefault().
-		WithDomainRateLimit("ip-api.com", rate.NewLimit().WithConstraint(1, time.Second)).
-		WithSourceFn(func() []string { return []string{"127.0.0.1:5000"} }).
-		Init()
+		WithDomainRateLimit("api.ipify.org", rate.NewLimit().WithConstraint(1, time.Second*3)).
+		Init(5)
 	_ = pb
-	time.Sleep(time.Hour)
+	for {
+		go func() {
+			req, _ := http.NewRequest("GET", "http://api.ipify.org/", nil)
+			ip := pb.Do(req)
+			log.Println(string(ip))
+		}()
+		time.Sleep(time.Millisecond * 250)
+	}
 }
 
 func SetUpLocalProxy() {

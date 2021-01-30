@@ -8,11 +8,15 @@ type Limit struct {
 	Max         int
 }
 
-func (limit Limit) Ready() bool {
-	return limit.Constraints.Ready(limit.Calls)
-}
+func (limit Limit) Ready() bool { return limit.Constraints.Ready(limit.Calls) }
 
-func (limit Limit) Clone() Limit { return limit }
+func (limit Limit) When() time.Duration { return limit.Constraints.When(limit.Calls) }
+
+func (limit Limit) Clone() *Limit {
+	copy := limit
+	copy.Calls = append(limit.Calls[:0:0], limit.Calls...)
+	return &copy
+}
 
 func (limit *Limit) Use() {
 	limit.Calls = append(limit.Calls, time.Now())

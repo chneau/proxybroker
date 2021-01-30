@@ -11,10 +11,12 @@ import (
 )
 
 type Proxy struct {
+	Name            string
 	Client          *http.Client
 	Times           []time.Duration
-	LimitsPerDomain map[string]rate.Limit
+	LimitsPerDomain map[string]*rate.Limit
 	mtx             *sync.Mutex
+	index           int
 }
 
 // sync allows to write `defer proxy.sync()()` one liner
@@ -34,7 +36,7 @@ func (proxy *Proxy) MeanTime() time.Duration {
 	return mean
 }
 
-func (proxy *Proxy) IsReady(req *http.Request) bool {
+func (proxy *Proxy) limitsOk(req *http.Request) bool {
 	if limit, exist := proxy.LimitsPerDomain[req.Host]; exist {
 		return limit.Ready()
 	}
@@ -43,13 +45,17 @@ func (proxy *Proxy) IsReady(req *http.Request) bool {
 
 func (proxy *Proxy) Do(req *http.Request) []byte {
 	defer proxy.sync()()
-	if !proxy.IsReady(req) {
+	if !proxy.limitsOk(req) {
+		proxy.Times = append(proxy.Times, proxy.Client.Timeout*10)
 		return nil
+	}
+	if limit, exist := proxy.LimitsPerDomain[req.Host]; exist {
+		limit.Use()
 	}
 	start := time.Now()
 	resp, err := proxy.Client.Do(req)
 	if err != nil {
-		proxy.Times = append(proxy.Times, time.Second*30)
+		proxy.Times = append(proxy.Times, proxy.Client.Timeout*10)
 		return nil
 	}
 	defer resp.Body.Close()
@@ -62,16 +68,18 @@ func (proxy *Proxy) Do(req *http.Request) []byte {
 }
 
 func NewProxy(proxy string) *Proxy {
-	proxyUrl, _ := url.Parse(proxy)
+	proxyUrl, _ := url.Parse("http://" + proxy)
 	p := &Proxy{
+		Name: proxy,
 		Client: &http.Client{
-			Timeout: time.Second * 3,
+			Timeout: time.Second * 10,
 			Transport: &http.Transport{
 				DisableKeepAlives: true,
 				Proxy:             http.ProxyURL(proxyUrl),
 			},
 		},
-		mtx: &sync.Mutex{},
+		mtx:             &sync.Mutex{},
+		LimitsPerDomain: map[string]*rate.Limit{},
 	}
 	return p
 }
