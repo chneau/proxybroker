@@ -34,8 +34,18 @@ func (proxy *Proxy) MeanTime() time.Duration {
 	return mean
 }
 
+func (proxy *Proxy) IsReady(req *http.Request) bool {
+	if limit, exist := proxy.LimitsPerDomain[req.Host]; exist {
+		return limit.Ready()
+	}
+	return true
+}
+
 func (proxy *Proxy) Do(req *http.Request) []byte {
 	defer proxy.sync()()
+	if !proxy.IsReady(req) {
+		return nil
+	}
 	start := time.Now()
 	resp, err := proxy.Client.Do(req)
 	if err != nil {
